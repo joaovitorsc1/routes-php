@@ -1,0 +1,15 @@
+{
+    "name": "project/routesphp",
+    "autoload": {
+        "psr-4": {
+            "Project\\Routesphp\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Joaoviitorc",
+            "email": "joao@gmail.com"
+        }
+    ],
+    "require": {}
+}
