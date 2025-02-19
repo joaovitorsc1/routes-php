@@ -9,58 +9,77 @@ use Project\Routesphp\Http\Response;
 
 class Core
 {
-    public function dispatch(array $routes, array $listMiddlewares)
+    public function dispatch(array $routes, array $middlewareList)
     {
-        foreach ($routes as $route) 
+        $uri = $_GET["uri"] ?? "/";
+
+        $uri !== "/" && $uri = rtrim($_GET["uri"], "/");
+
+        foreach($routes as $route)
         {
+            $routeUri = $route["uri"] ?? "";
+            $routeUri !== "/" && $routeUri = trim($route["uri"], "/");
+
             $routerFound = false;
 
-            $pattern = "#^" . preg_replace("(:id)", "[\w-]+", rtrim($route["uri"], "/")) . "$#";
-            if(preg_match($pattern, Request::getUri(), $matches)) 
+            $pattern = "#^" . preg_replace("(:any)", "[\w\-]+", $routeUri) . "$#";
+            if(preg_match($pattern, $uri, $matches))
             {
                 $routerFound = true;
 
-                if(Request::getMethod() !== $route["method"]) 
+                if(Request::getMethod() !== $route["method"])
                 {
-                    return Response::json(["message" => "Method not allowed"], 405);
+                    Response::json([
+                        "status" => "error",
+                        "message" => "Method Not Allowed"
+                    ], 405);
                 }
 
                 array_shift($matches);
-                $parameters  = $matches;
-                $options     = $route["options"];
-                $middlewares = $route["middleware"];
+                $parameters     = $matches;
+                $middlewares    = $route["middlewares"];
+                $options        = $route["options"];
 
                 if(!empty($middlewares))
                 {
-                    $this->handleMiddleware($middlewares, $listMiddlewares, $options, $parameters);
+                    $this->handleMiddleware($middlewares, $middlewareList, $options, $parameters);
+                } else
+                {
+                    $this->handleController($options, $parameters);
                 }
+                return;
             }
         }
-        if(!$routerFound) 
+        
+        if(!$routerFound)
         {
-            return Response::json(["message" => "Route not found"], 404);
+            Response::json([
+                "status" => "error",
+                "message" => "Router Not Found"
+            ], 404);
         }
     }
 
-    public function handleMiddleware(array $middlewares, array $listMiddlewares, array $options, array $params)
+    public function handleMiddleware(array $middlewares, array $middlewareList, array $options, array $parameters)
     {
-        foreach($middlewares as $middleware) 
+        foreach($middlewares as $middleware)
         {
-            if(array_key_exists($middleware, $listMiddlewares)) 
+            if(array_key_exists($middleware, $middlewareList))
             {
-                $middleware = $listMiddlewares[$middleware];
-                $middlewareObj = new $middleware;
+                $middlewareClass = $middlewareList[$middleware];
+                $middlewareObj   = new $middlewareClass;
                 $middlewareObj->handle();
             }
         }
-        $this->handleController($options, $params);
+
+        $this->handleController($options, $parameters);
     }
 
-    public function handleController(array $options, array $params)
+    public function handleController(array $options, array $parameters)
     {
         [$controller, $method] = $options;
-        $controllerInstance = ContainerDependency::get($controller);
-        $controllerInstance->$method(...$params);
+        $containerDependency = ContainerDependency::get($controller);
+        $containerDependency->$method(...$parameters);
     }
 }
 ?>
